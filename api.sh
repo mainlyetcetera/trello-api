@@ -55,6 +55,16 @@ build_id_file () {
     echo 'https://api.trello.com/1/boards/{id}/lists?fields=name&key={apiKey}&token={apiToken}' | sed "s/{apiKey}/$(cat key.txt)/g" | sed "s/{apiToken}/$(cat token.txt)/g" | sed "s/{id}/$(cat board.txt)/g" | xargs -I {} curl -s --header 'Accept: application/json' {} | jq ".[] | select(.name | startswith(\"$3\")) | .id" | sed 's/"//g' > $1
 }
 
+# get priority project
+# get project list (at this point, don't i already have it?!)
+# find what has the priority label
+# add its name to the end of the output: "* priority project is: <name>"
+find_priority_project () {
+    echo "[INFO]: finding $2"
+    cp project_ids.txt priority_project.txt
+    echo 'https://api.trello.com/1/lists/{yourList}/cards?fields=name,labels&key={yourKey}&token={yourToken}' | sed "s/{yourKey}/$(cat key.txt)/g" | sed "s/{yourToken}/$(cat token.txt)/g" | sed "s/{yourList}/$(cat $1.txt)/g" | xargs -I {} curl -s {} | jq '.[] | select(.labels[].name == "priority") | { id, name, labels: [.labels[] | select(.name == "priority") | { id, name }] }' > $1.json
+}
+
 check_for_file 'key.txt' 'api key'
 check_for_file 'token.txt' 'api token'
 check_for_file 'board.txt' 'board'
@@ -102,6 +112,23 @@ if [[ -f 'anime_cat_girl.txt' ]]; then
     rm anime_cat_girl.txt
 fi
 
+check_for_optional_file () {
+    echo "[INFO]: checkin' for $2's list"
+    f=$(find . -maxdepth 1 -name $1)
+    ff=$(jq . $f | wc -w)
+
+    if [[ $ff -eq 0 ]];
+    then
+        # echo "status: $?"
+        # echo "[WARN]: did not find $2's list"
+        echo 1
+    else
+        # echo "status: $?"
+        # echo "[INFO]: found $2's list at $f"
+        echo 0
+    fi
+}
+
 touch anime_cat_girl.txt
 
 for (( i = 0; i < pl; i++ )); 
@@ -121,7 +148,18 @@ do
     done
 done
 
+find_priority_project 'priority_project' 'priority project'
+priority=$(jq .name priority_project.json)
+# test=$(check_for_optional_file 'priority_project.json' 'priority project')
+# if [[ $test -eq 0 ]]; then
+#     echo 'build priority'
+# else
+#     echo 'nah man'
+# fi
+
 echo
+echo >> anime_cat_girl.txt
+echo "* priority project is: $priority" | sed 's/"//g' | sed 's/\\//g' >> anime_cat_girl.txt
 echo '[RESULTS]:'
 echo
 cat anime_cat_girl.txt
